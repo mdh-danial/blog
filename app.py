@@ -49,12 +49,33 @@ def create_table():
 # create route
 @app.route("/api/blog/post", methods=["POST"])
 def create_post():
-    data = request.get_json()
+
+    # obtain data from request
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({"message": "Bad request"}), 400
+
     title = data.get("title")
     content = data.get("content")
     category = data.get("category")
     tags = data.get("tags", [])  # list of strings
-    tags = [normalize_tag(t) for t in tags]
+    
+    # validate keys from JSON request 
+    if not title or not isinstance(title, str):
+        return jsonify({"message":"Must be valid title"}), 400
+    if not content or not isinstance(content, str):
+        return jsonify({"message":"Must have valid content"}), 400
+    if category is not None and not isinstance(category, str):
+        return jsonify({"message":"Category must be a string"}), 400
+    if not isinstance(tags, list):
+        return jsonify({"message":"tag must be a list"}), 400
+    
+    # ensure all tags are strings
+    cleaned_tags = []
+    for t in tags:
+        if isinstance(t, str):
+            cleaned_tags.append(normalize_tag(t))
+    tags = cleaned_tags
 
     # ensure tables exist
     create_table()
@@ -86,14 +107,95 @@ def create_post():
         """, (blog_id, tag_id))
 
     conn.commit()
+
+    # Select creation and update time from blogs
+    c.execute("""
+              SELECT createdAt, updatedAt FROM blogs
+              WHERE id = ?  
+          """, (blog_id,))
+    row = c.fetchone()
+    createdAt = row["createdAt"]
+    updatedAt = row["updatedAt"]
     conn.close()
 
-    return jsonify({"message": "Blog created successfully!", "blog_id": blog_id})
+    return jsonify({
+        "message": "Blog created successfully!", 
+        "id": blog_id,
+        "title": title,
+        "content": content,
+        "category": category,
+        "tags": tags,
+        "createdAt": createdAt,
+        "updatedAt": updatedAt
+    }), 201
 
 # update route
-@app.route("/api/blog/<update>", methods=["GET"])
-def update(update):
-    ...
+@app.route("/api/blog/<int:id>", methods=["PUT"])
+def update(id):
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"message":"Bad request"}), 400
+    
+    title = data.get("title")
+    content = data.get("content")
+    category = data.get("category")
+    tags = data.get("tags", [])  # list of strings
+
+    # validate data
+    if not title or not isinstance(title, str):
+        return jsonify({"message":"Must have title"}), 400
+    
+    if not content or not isinstance(content, str):
+        return jsonify({"message":"Must have content"}), 400
+    
+    if category is not None and not isinstance(category, str):
+        return jsonify({"message":"Category must be a string"}), 400
+    
+    if not isinstance(tags, list):
+        return jsonify({"message":"tags must be a list"}), 400
+    
+    #normalise tags
+    tags = [normalize_tag(t) for t in tags[:10]]
+
+    if len(title) > 200:
+        return jsonify({"message":"title too long"}), 400
+    
+    if len(content) > 10000:
+        return jsonify({"message":"content too long"}), 400
+    
+    # Update data in table
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute("""
+        UPDATE blogs 
+        SET title = ?, content = ?, category = ?, updatedAt = DATE('now')
+        WHERE id = ?
+        """, (title, content, category, id))
+    if c.rowcount == 0:
+        conn.close()
+        return jsonify({"message":"Blog not found"}), 404
+    
+    conn.commit()
+
+    c.execute("""
+            SELECT createdAt, updatedAt FROM blogs
+            WHERE id = ?
+         """, (id,))
+    row = c.fetchone()
+    createdAt = row["createdAt"]
+    updatedAt = row["updatedAt"]
+
+    return jsonify({
+        "id": id,
+        "title": title,
+        "content": content,
+        "category": category,
+        "tags": tags,
+        "createdAt": createdAt,
+        "updatedAt": updatedAt
+    }), 200
+    
 
 # delete route
 @app.route("/api/blog/<delete>")

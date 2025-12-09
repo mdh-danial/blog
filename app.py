@@ -163,7 +163,7 @@ def update(id):
     if len(content) > 10000:
         return jsonify({"message":"content too long"}), 400
     
-    # Update data in table
+    # Update data in blogs table
     conn = get_db()
     c = conn.cursor()
 
@@ -178,6 +178,31 @@ def update(id):
     
     conn.commit()
 
+    # Update tags table and connect tags to blog
+
+    # Delete tags related to blog
+    c.execute("""
+            DELETE FROM blog_tags WHERE blog_id = ?
+          """, (id,))
+    
+    # Insert tags one by one, link to blog
+    for tag in tags:
+        # insert tag if not exist
+        c.execute("INSERT OR IGNORE INTO tags (name) VALUES (?)", (tag,))
+        
+        # retrieve tag_id (whether newly created or existing)
+        c.execute("SELECT id FROM tags WHERE name = ?", (tag,))
+        tag_id = c.fetchone()["id"]
+
+        # link blog + tag
+        c.execute("""
+            INSERT OR IGNORE INTO blog_tags (blog_id, tag_id)
+            VALUES (?, ?)
+        """, (id, tag_id))
+
+    conn.commit()
+
+    # Select dates
     c.execute("""
             SELECT createdAt, updatedAt FROM blogs
             WHERE id = ?
@@ -198,9 +223,100 @@ def update(id):
     
 
 # delete route
-@app.route("/api/blog/<delete>")
-def delete(delete):
-    ...
+@app.route("/api/blog/<int:id>", methods=["DELETE"])
+def delete(id):
+    
+    # set up db connection
+    conn = get_db()
+    c = conn.cursor()
 
+    # delete from blogs table
+    c.execute("""
+            DELETE FROM blogs WHERE id = ?
+        """, (id,))
+    conn.commit()
+    
+    if c.rowcount == 0:
+        return jsonify({"message":"Blog not found"}), 404
+    
+    # delete from blog_tags
+    c.execute("""
+            DELETE FROM blog_tags WHERE blog_id = ?      
+        """, (id,))
+    conn.commit()
+
+    # delete tags not belonging to any blogs
+    c.execute("""
+            DELETE FROM tags
+            WHERE id NOT IN (SELECT tag_id FROM blog_tags)
+        """)
+    conn.commit()
+    
+    return "", 204
+
+@app.route("/api/blog/<int:id>", methods=["GET"])
+def get_blog(id):
+    # set db connection
+    conn = get_db()
+    c = conn.cursor()
+
+    # select from blogs using input ID
+    c.execute("""
+            SELECT * FROM blogs
+            WHERE id = ?
+        """, (id,))
+    
+    blog = c.fetchone()
+    if not blog:
+        return jsonify({"message":"Not found"}), 404
+    
+    title = blog["title"]
+    content = blog["content"]
+    category = blog["category"]
+    createdAt = blog["createdAt"]
+    updatedAt = blog["updatedAt"]
+
+    # obtain tags
+    tags = []
+    c.execute("""
+            SELECT tag_id FROM blog_tags
+            WHERE blog_id = ?
+        """, (id,))
+    row = c.fetchall()
+
+    for r in row:
+        tag_id = r["tag_id"]
+
+        c.execute("""
+                SELECT name FROM tags
+                WHERE id = ?
+            """, (tag_id,))
+        
+        tag_row = c.fetchone()
+        if tag_row:
+            tags.append(tag_row["name"])
+    
+    return jsonify({
+        "id":id,
+        "title":title,
+        "content":content,
+        "category":category,
+        "tags":tags,
+        "createdAt":createdAt,
+        "updatedAt":updatedAt
+    }), 200
+
+
+@app.route("/api/blog", methods=["GET"])
+def get_all_blogs():
+    
+    # set db connection
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute("""
+            SELECT * FROM blogs
+            WHERE id = ?
+        """, ())
 
 

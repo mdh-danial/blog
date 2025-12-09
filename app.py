@@ -309,14 +309,47 @@ def get_blog(id):
 
 @app.route("/api/blog", methods=["GET"])
 def get_all_blogs():
-    
-    # set db connection
     conn = get_db()
     c = conn.cursor()
 
-    c.execute("""
+    term = request.args.get("term")
+    blogs = []
+
+    if term:
+        like_pattern = f"%{term}%"
+        c.execute("""
             SELECT * FROM blogs
-            WHERE id = ?
-        """, ())
+            WHERE title LIKE ? OR content LIKE ? OR category LIKE ?
+        """, (like_pattern, like_pattern, like_pattern))
+    else:
+        c.execute("SELECT * FROM blogs")
+    
+    blog_rows = c.fetchall()
+    if not blog_rows:
+        return jsonify({"message": "No blogs found"}), 404
+
+    for blog in blog_rows:
+        tags = []
+        c.execute("SELECT tag_id FROM blog_tags WHERE blog_id = ?", (blog["id"],))
+        tag_rows = c.fetchall()
+
+        for t in tag_rows:
+            c.execute("SELECT name FROM tags WHERE id = ?", (t["tag_id"],))
+            t_row = c.fetchone()
+            if t_row:
+                tags.append(t_row["name"])
+
+        blogs.append({
+            "id": blog["id"],
+            "title": blog["title"],
+            "content": blog["content"],
+            "category": blog["category"],
+            "tags": tags,
+            "createdAt": blog["createdAt"],
+            "updatedAt": blog["updatedAt"]
+        })
+
+    return jsonify(blogs), 200
+
 
 

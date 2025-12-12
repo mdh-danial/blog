@@ -47,7 +47,7 @@ def create_table():
     conn.close()
 
 # create route
-@app.route("/api/blog/post", methods=["POST"])
+@app.route("/api/blog", methods=["POST"])
 def create_post():
 
     # obtain data from request
@@ -76,9 +76,6 @@ def create_post():
         if isinstance(t, str):
             cleaned_tags.append(normalize_tag(t))
     tags = cleaned_tags
-
-    # ensure tables exist
-    create_table()
 
     conn = get_db()
     c = conn.cursor()
@@ -254,6 +251,7 @@ def delete(id):
     
     return "", 204
 
+# get one blog by id
 @app.route("/api/blog/<int:id>", methods=["GET"])
 def get_blog(id):
     # set db connection
@@ -306,7 +304,7 @@ def get_blog(id):
         "updatedAt":updatedAt
     }), 200
 
-
+# get all blogs, or specify a term of blogs
 @app.route("/api/blog", methods=["GET"])
 def get_all_blogs():
     conn = get_db()
@@ -351,5 +349,9 @@ def get_all_blogs():
 
     return jsonify(blogs), 200
 
+if __name__ == '__main__':
+    # ensure tables exist
+    create_table()
 
-
+    # run app
+    app.run(debug=True)

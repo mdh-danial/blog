@@ -33,3 +33,19 @@ tags = data.get("tags", []) # default empty list
 
 # return json message 
 return jsonify({"message": "Blog created successfully"}), 201
+```
+## requests library
+- I learnt that the requests library consists of many call methods, not just "GET"
+```python
+import requests
+
+# example of calls
+requests.get(), requests.post(), requests.put(), requests.delete()
+```
+- a "POST" or "PUT" would require you to send data in the form of json
+
+## How to add input into a URL endpoint with Flask
+- It is possible to input into function wrapped within URL endpoint using /<value_here>
+- value within the <> tag will be put into the function
+- it is also possible to ensure value is of a specific type, e.g. requires an input of type integer = <int:value>, 
+or requires input of type string = <str:value>, or type float = <float:value>

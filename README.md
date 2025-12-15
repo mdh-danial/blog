@@ -4,6 +4,8 @@
 A RESTful API with CRUD operations for a blogging
 platform.
 
+This project was based on roadmap.sh: https://roadmap.sh/projects/blogging-platform-api
+
 ## Usage
 1. Create a blog: In the url, follow the app route, /api/blog, and use python requests' post method, requests.post, and include the blog user wants to add in the form of a dictionary, json=payload.
 
